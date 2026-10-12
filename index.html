@@ -35,6 +35,7 @@ button:active{background:var(--acbg)}
 .edited{color:var(--warn);font-size:12px}
 #msg{min-height:18px;font-size:12px;color:var(--warn);margin-top:6px}
 .note{font-size:12px;color:var(--mut);margin-top:10px}
+.pt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 4px;margin-top:10px;text-align:center}.pt b{display:block;font-weight:500;font-size:13px;color:var(--mut)}.pt span{font-size:16px;font-weight:600}.row input{flex:1;min-width:0;font:inherit;padding:8px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx)}.on{background:var(--acbg)}
 </style>
 </head>
 <body>
@@ -56,6 +57,7 @@ button:active{background:var(--acbg)}
   <div class="row"><button id="reset">Reset this month</button></div>
   <div id="msg"></div>
 </div>
+<div class="card"><div class="big">Prayer times</div><div class="note" id="plc"></div><div class="pt" id="pt"></div><div class="row"><button id="gps">Use my location</button><button id="mc">Enter coordinates</button></div><div class="row" id="crow" style="display:none"><input id="la" placeholder="Latitude e.g. 27.85" inputmode="decimal"><input id="lo" placeholder="Longitude e.g. 67.90" inputmode="decimal"><button id="csv">Save</button></div><div class="row"><span>Asr</span><button id="as">Standard</button><button id="ah">Hanafi</button></div><div class="note" id="pmsg"></div></div>
 <div class="note">Base dates use the Umm al-Qura calendar. Adjust only the month you need: other months stay unchanged. Changes are saved on this device.</div>
 
 <script>
@@ -108,20 +110,45 @@ function render(){
   $('mInfo').innerHTML=`${MN[h.m-1]} ${h.y}: starts ${D(h.s,{weekday:'short',day:'numeric',month:'short'})}, ${L} days${ed?' <span class="edited">(edited)</span>':''}`;
 }
 function curK(){return hij(sel).k}
-function tryStart(k,v){const pl=v-start(k-1),ol=start(k+1)-v;
-  if(pl<29||pl>30||ol<29||ol>30){say('Not possible: neighbouring months must stay 29 or 30 days.');return}
-  setStart(k,v);say('');render()}
+function fixFwd(k){for(let j=k;j<k+12;j++){const L=start(j+1)-start(j);if(L<29)setStart(j+1,start(j)+29);else if(L>30)setStart(j+1,start(j)+30);else break}}
+function tryStart(k,v){const pl=v-start(k-1);
+  if(pl<29||pl>30){say('Not possible: the previous month would become '+pl+' days. Set the previous month length first.');return}
+  setStart(k,v);fixFwd(k);say('');render()}
 $('sm').onclick=()=>{const k=curK();tryStart(k,start(k)-1)};
 $('sp').onclick=()=>{const k=curK();tryStart(k,start(k)+1)};
-function setLen(L){const k=curK();const v=start(k)+L;const nl=start(k+2)-v;
-  if(nl<29||nl>30){say('Not possible: next month would become '+nl+' days. Adjust the next month first.');return}
-  setStart(k+1,v);say('');render()}
+function setLen(L){const k=curK();setStart(k+1,start(k)+L);fixFwd(k+1);say('');render()}
 $('l29').onclick=()=>setLen(29);
 $('l30').onclick=()=>setLen(30);
 $('reset').onclick=()=>{const k=curK();delete ov[k];delete ov[k+1];save();say('');render()};
 $('prev').onclick=()=>{vm--;if(vm<0){vm=11;vy--}render()};
 $('next').onclick=()=>{vm++;if(vm>11){vm=0;vy++}render()};
 $('today').onclick=()=>{sel=todayN;vy=nowL.getFullYear();vm=nowL.getMonth();render()};
+const R=Math.PI/180,sind=x=>Math.sin(x*R),cosd=x=>Math.cos(x*R),tand=x=>Math.tan(x*R),asn=x=>Math.asin(x)/R,acs=x=>Math.acos(x)/R,at2=(y,x)=>Math.atan2(y,x)/R,fx=(a,b)=>{a=a-b*Math.floor(a/b);return a<0?a+b:a};
+function jul(Y,M,D){if(M<=2){Y--;M+=12}const A=Math.floor(Y/100),B=2-A+Math.floor(A/4);return Math.floor(365.25*(Y+4716))+Math.floor(30.6001*(M+1))+D+B-1524.5}
+function sunPos(j){const d=j-2451545,g=fx(357.529+0.98560028*d,360),q=fx(280.459+0.98564736*d,360),L=fx(q+1.915*sind(g)+0.02*sind(2*g),360),e=23.439-3.6e-7*d,RA=fx(at2(cosd(e)*sind(L),cosd(L))/15,24);return{decl:asn(sind(e)*sind(L)),eq:q/15-RA}}
+function pray(Y,M,D,lat,lng,tz,asr){const J=jul(Y,M,D)-lng/360,S=h=>sunPos(J+h/24),mid=h=>fx(12-S(h).eq,24);
+ const ang=(a,h,ccw)=>{const s=S(h),v=(-sind(a)-sind(s.decl)*sind(lat))/(cosd(s.decl)*cosd(lat));return mid(h)+(ccw?-1:1)*acs(v)/15};
+ const s13=S(13),aa=-Math.atan(1/(asr+tand(Math.abs(lat-s13.decl))))/R,av=(sind(aa)-sind(s13.decl)*sind(lat))/(cosd(s13.decl)*cosd(lat));
+ const adj=(18),k=tz-lng/15;
+ const fajr=ang(adj,5,1)+k,sr=ang(0.833,6,1)+k,dh=mid(12)+k,as=mid(13)+acs(av)/15+k,mg=ang(0.833,18)+k,is=ang(adj,18)+k;
+ return{Imsak:fajr-10/60,Fajr:fajr,Sunrise:sr,Dhuhr:dh,Asr:as,Maghrib:mg,Isha:is,Midnight:mg+fx(sr-mg,24)/2}}
+function ft(h){if(!isFinite(h))return'--';h=fx(h+0.5/60,24);let H=Math.floor(h),m=Math.floor((h-H)*60);const ap=H>=12?'PM':'AM';H=H%12||12;return H+':'+String(m).padStart(2,'0')+' '+ap}
+let loc={lat:24.8607,lng:67.0011,asr:2,def:true};try{Object.assign(loc,JSON.parse(localStorage.getItem('hijri_loc')||'{}'))}catch(e){}
+const saveLoc=()=>{try{localStorage.setItem('hijri_loc',JSON.stringify(loc))}catch(e){}};
+const pm=t=>{$('pmsg').textContent=t};
+function prayer(){const dt=new Date(sel*DAY),Y=dt.getUTCFullYear(),M=dt.getUTCMonth()+1,D=dt.getUTCDate(),tz=-new Date(Y,M-1,D,12).getTimezoneOffset()/60;
+ const p=pray(Y,M,D,loc.lat,loc.lng,tz,loc.asr);
+ $('pt').innerHTML=Object.keys(p).map(k=>`<div><b>${k}</b><span>${ft(p[k])}</span></div>`).join('');
+ $('plc').textContent=`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}${loc.def?' (Karachi, default: set your location)':''} · Karachi method (18°)`;
+ $('as').classList.toggle('on',loc.asr===1);$('ah').classList.toggle('on',loc.asr===2)}
+const _r=render;render=function(){_r();prayer()};
+async function getPos(){const P=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Geolocation;
+ if(P){try{await P.requestPermissions();const r=await P.getCurrentPosition({timeout:20000});return r.coords}catch(e){}}
+ return new Promise((ok,no)=>navigator.geolocation?navigator.geolocation.getCurrentPosition(p=>ok(p.coords),no,{timeout:20000}):no(new Error('no geolocation')))}
+$('gps').onclick=async()=>{pm('Getting location…');try{const c=await getPos();loc.lat=c.latitude;loc.lng=c.longitude;loc.def=false;saveLoc();pm('Location updated.');render()}catch(e){pm('Could not get location. Allow location permission, or enter coordinates.')}};
+$('mc').onclick=()=>{const r=$('crow');r.style.display=r.style.display==='none'?'flex':'none'};
+$('csv').onclick=()=>{const a=parseFloat($('la').value),b=parseFloat($('lo').value);if(!(a>=-66&&a<=66&&b>=-180&&b<=180)){pm('Enter valid numbers (latitude -66 to 66, longitude -180 to 180).');return}loc.lat=a;loc.lng=b;loc.def=false;saveLoc();pm('Saved.');$('crow').style.display='none';render()};
+$('as').onclick=()=>{loc.asr=1;saveLoc();render()};$('ah').onclick=()=>{loc.asr=2;saveLoc();render()};
 render();
 </script>
 </body>
