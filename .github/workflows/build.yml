@@ -14,11 +14,11 @@ jobs:
           java-version: 21
       - run: |
           npm init -y
-          npm i @capacitor/core @capacitor/cli @capacitor/android
-          npm i @capacitor/geolocation
+          npm i @capacitor/core @capacitor/cli @capacitor/android @capacitor/geolocation
           mkdir www && cp index.html www/
           npx cap init "Hijri Calendar" com.example.hijricalendar --web-dir www
           npx cap add android
+          sed -i 's#<application#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><application#' android/app/src/main/AndroidManifest.xml
           npx cap sync android
           cd android && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
