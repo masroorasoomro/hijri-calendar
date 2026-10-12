@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hijri + Gregorian Calendar</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f7f4;--card:#fff;--tx:#1d2420;--mut:#6b756f;--ac:#0f766e;--acbg:#d7efec;--bd:#e1e5e0;--warn:#b45309}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111614;--card:#1a211e;--tx:#e8eeea;--mut:#92a09a;--ac:#2dd4bf;--acbg:#14403b;--bd:#28312d;--warn:#fbbf24}}
+:root[data-theme="dark"]{--bg:#111614;--card:#1a211e;--tx:#e8eeea;--mut:#92a09a;--ac:#2dd4bf;--acbg:#14403b;--bd:#28312d;--warn:#fbbf24}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:480px;margin:0 auto;padding:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+h1{font-size:18px;margin:0;text-align:center;flex:1}
+.sub{text-align:center;color:var(--mut);font-size:13px;margin:2px 0 10px}
+button{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;padding:8px 12px;cursor:pointer}
+button:active{background:var(--acbg)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.wd{text-align:center;font-size:11px;color:var(--mut);padding:4px 0}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:10px;min-height:54px;padding:4px 2px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2}
+.c.e{visibility:hidden}
+.g{font-size:16px;font-weight:600}
+.h{font-size:11px;color:var(--mut)}
+.c.fri .g{color:var(--ac)}
+.c.today{border-color:var(--ac);border-width:2px}
+.c.sel{background:var(--acbg)}
+.c.h1 .h{color:var(--ac);font-weight:700}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-top:12px}
+.big{font-size:17px;font-weight:600}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.row span{font-size:13px;color:var(--mut);min-width:84px}
+.row button{flex:1}
+.edited{color:var(--warn);font-size:12px}
+#msg{min-height:18px;font-size:12px;color:var(--warn);margin-top:6px}
+.note{font-size:12px;color:var(--mut);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="top">
+  <button id="prev" aria-label="Previous month">‹</button>
+  <h1 id="title"></h1>
+  <button id="next" aria-label="Next month">›</button>
+</div>
+<div class="sub" id="sub"></div>
+<div class="grid" id="grid"></div>
+<div class="row"><button id="today">Today</button></div>
+
+<div class="card">
+  <div class="big" id="selG"></div>
+  <div class="big" id="selH" style="color:var(--ac)"></div>
+  <div class="note" id="mInfo"></div>
+  <div class="row"><span>Month start</span><button id="sm">−1 day</button><button id="sp">+1 day</button></div>
+  <div class="row"><span>Month length</span><button id="l29">29 days</button><button id="l30">30 days</button></div>
+  <div class="row"><button id="reset">Reset this month</button></div>
+  <div id="msg"></div>
+</div>
+<div class="note">Base dates use the Umm al-Qura calendar. Adjust only the month you need: other months stay unchanged. Changes are saved on this device.</div>
+
+<script>
+const DAY=864e5;
+const MN=["Muharram","Safar","Rabi al-Awwal","Rabi al-Thani","Jumada al-Awwal","Jumada al-Thani","Rajab","Shaban","Ramadan","Shawwal","Dhul Qadah","Dhul Hijjah"];
+const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const mk=c=>new Intl.DateTimeFormat('en-u-ca-'+c+'-nu-latn',{timeZone:'UTC',year:'numeric',month:'numeric',day:'numeric'});
+let F;try{F=mk('islamic-umalqura');F.format(0)}catch(e){F=mk('islamic-civil')}
+function bh(n){let y,m,d;for(const p of F.formatToParts(new Date(n*DAY))){if(p.type==='year')y=+p.value;if(p.type==='month')m=+p.value;if(p.type==='day')d=+p.value}return{y,m,d}}
+const e0=new Date(0);e0.setUTCFullYear(622,6,19);const N0=Math.floor(e0/DAY);
+const bc=new Map();
+function baseStart(k){
+  if(bc.has(k))return bc.get(k);
+  const y=Math.floor(k/12),m=k%12+1;let est=N0+Math.round(k*29.530588);
+  for(let i=0;i<40;i++){const h=bh(est);const diff=(h.y*12+h.m)-(y*12+m);
+    if(diff===0){est-=h.d-1;break}
+    est-=Math.round(diff*29.53)||Math.sign(diff)}
+  bc.set(k,est);return est}
+let ov={};try{ov=JSON.parse(localStorage.getItem('hijri_ov')||'{}')}catch(e){}
+function save(){try{localStorage.setItem('hijri_ov',JSON.stringify(ov))}catch(e){}}
+const start=k=>ov[k]!==undefined?ov[k]:baseStart(k);
+const len=k=>start(k+1)-start(k);
+function hij(n){const b=bh(n),k0=b.y*12+b.m-1;
+  for(const k of [k0+1,k0,k0-1]){const s=start(k);if(s<=n)return{k,y:Math.floor(k/12),m:k%12+1,d:n-s+1,s}}
+  return{k:k0-1,y:b.y,m:b.m,d:b.d,s:n-b.d+1}}
+function setStart(k,v){if(v===baseStart(k))delete ov[k];else ov[k]=v;save()}
+const D=(n,o)=>new Date(n*DAY).toLocaleDateString('en-GB',Object.assign({timeZone:'UTC'},o));
+const nowL=new Date();const todayN=Math.floor(Date.UTC(nowL.getFullYear(),nowL.getMonth(),nowL.getDate())/DAY);
+let sel=todayN,vy=nowL.getFullYear(),vm=nowL.getMonth();
+const $=id=>document.getElementById(id);
+const say=t=>{$('msg').textContent=t;if(t)setTimeout(()=>{$('msg').textContent=''},3500)};
+
+function render(){
+  const first=Math.floor(Date.UTC(vy,vm,1)/DAY),dim=new Date(Date.UTC(vy,vm+1,0)).getUTCDate();
+  $('title').textContent=D(first,{month:'long',year:'numeric'});
+  const a=hij(first),z=hij(first+dim-1);
+  $('sub').textContent=a.k===z.k?`${MN[a.m-1]} ${a.y}`:`${MN[a.m-1]} ${a.y} – ${MN[z.m-1]} ${z.y}`;
+  const g=$('grid');g.innerHTML='';
+  WD.forEach(w=>{const d=document.createElement('div');d.className='wd';d.textContent=w;g.appendChild(d)});
+  const off=(new Date(first*DAY)).getUTCDay();
+  for(let i=0;i<off;i++){const d=document.createElement('div');d.className='c e';g.appendChild(d)}
+  for(let i=0;i<dim;i++){const n=first+i,h=hij(n),c=document.createElement('div');
+    c.className='c'+(h.d===1?' h1':'')+((off+i)%7===5?' fri':'')+(n===todayN?' today':'')+(n===sel?' sel':'');
+    c.innerHTML=`<span class="g">${i+1}</span><span class="h">${h.d===1?MN[h.m-1].split(' ')[0].slice(0,5)+' 1':h.d}</span>`;
+    c.onclick=()=>{sel=n;render()};g.appendChild(c)}
+  const h=hij(sel);
+  $('selG').textContent=D(sel,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  $('selH').textContent=`${h.d} ${MN[h.m-1]} ${h.y} AH`;
+  const L=len(h.k),ed=(ov[h.k]!==undefined||ov[h.k+1]!==undefined);
+  $('mInfo').innerHTML=`${MN[h.m-1]} ${h.y}: starts ${D(h.s,{weekday:'short',day:'numeric',month:'short'})}, ${L} days${ed?' <span class="edited">(edited)</span>':''}`;
+}
+function curK(){return hij(sel).k}
+function tryStart(k,v){const pl=v-start(k-1),ol=start(k+1)-v;
+  if(pl<29||pl>30||ol<29||ol>30){say('Not possible: neighbouring months must stay 29 or 30 days.');return}
+  setStart(k,v);say('');render()}
+$('sm').onclick=()=>{const k=curK();tryStart(k,start(k)-1)};
+$('sp').onclick=()=>{const k=curK();tryStart(k,start(k)+1)};
+function setLen(L){const k=curK();const v=start(k)+L;const nl=start(k+2)-v;
+  if(nl<29||nl>30){say('Not possible: next month would become '+nl+' days. Adjust the next month first.');return}
+  setStart(k+1,v);say('');render()}
+$('l29').onclick=()=>setLen(29);
+$('l30').onclick=()=>setLen(30);
+$('reset').onclick=()=>{const k=curK();delete ov[k];delete ov[k+1];save();say('');render()};
+$('prev').onclick=()=>{vm--;if(vm<0){vm=11;vy--}render()};
+$('next').onclick=()=>{vm++;if(vm>11){vm=0;vy++}render()};
+$('today').onclick=()=>{sel=todayN;vy=nowL.getFullYear();vm=nowL.getMonth();render()};
+render();
+</script>
+</body>
+</html>
