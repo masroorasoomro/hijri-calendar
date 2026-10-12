@@ -57,7 +57,7 @@ button:active{background:var(--acbg)}
   <div class="row"><button id="reset">Reset this month</button></div>
   <div id="msg"></div>
 </div>
-<div class="card"><div class="big">Prayer times</div><div class="note" id="plc"></div><div class="pt" id="pt"></div><div class="row"><button id="gps">Use my location</button><button id="mc">Enter coordinates</button></div><div class="row" id="crow" style="display:none"><input id="la" placeholder="Latitude e.g. 27.85" inputmode="decimal"><input id="lo" placeholder="Longitude e.g. 67.90" inputmode="decimal"><button id="csv">Save</button></div><div class="row"><span>Asr</span><button id="as">Standard</button><button id="ah">Hanafi</button></div><div class="note" id="pmsg"></div></div>
+<div class="card"><div class="big">Prayer times <span id="pd" style="font-size:13px;font-weight:400;color:var(--mut)"></span></div><div class="note" id="plc"></div><div class="pt" id="pt"></div><div class="row"><button id="gps">Use my location</button><button id="mc">Enter coordinates</button></div><div class="row" id="crow" style="display:none"><input id="la" placeholder="Latitude e.g. 27.85" inputmode="decimal"><input id="lo" placeholder="Longitude e.g. 67.90" inputmode="decimal"><button id="csv">Save</button></div><div class="row"><span>Asr</span><button id="as">Standard</button><button id="ah">Hanafi</button></div><div class="note" id="pmsg"></div></div>
 <div class="note">Base dates use the Umm al-Qura calendar. Adjust only the month you need: other months stay unchanged. Changes are saved on this device.</div>
 
 <script>
@@ -128,7 +128,7 @@ function jul(Y,M,D){if(M<=2){Y--;M+=12}const A=Math.floor(Y/100),B=2-A+Math.floo
 function sunPos(j){const d=j-2451545,g=fx(357.529+0.98560028*d,360),q=fx(280.459+0.98564736*d,360),L=fx(q+1.915*sind(g)+0.02*sind(2*g),360),e=23.439-3.6e-7*d,RA=fx(at2(cosd(e)*sind(L),cosd(L))/15,24);return{decl:asn(sind(e)*sind(L)),eq:q/15-RA}}
 function pray(Y,M,D,lat,lng,tz,asr){const J=jul(Y,M,D)-lng/360,S=h=>sunPos(J+h/24),mid=h=>fx(12-S(h).eq,24);
  const ang=(a,h,ccw)=>{const s=S(h),v=(-sind(a)-sind(s.decl)*sind(lat))/(cosd(s.decl)*cosd(lat));return mid(h)+(ccw?-1:1)*acs(v)/15};
- const s13=S(13),aa=-Math.atan(1/(asr+tand(Math.abs(lat-s13.decl))))/R,av=(sind(aa)-sind(s13.decl)*sind(lat))/(cosd(s13.decl)*cosd(lat));
+ const s13=S(13),aa=-Math.atan(1/(asr+tand(Math.abs(lat-s13.decl))))/R,av=(-sind(aa)-sind(s13.decl)*sind(lat))/(cosd(s13.decl)*cosd(lat));
  const adj=(18),k=tz-lng/15;
  const fajr=ang(adj,5,1)+k,sr=ang(0.833,6,1)+k,dh=mid(12)+k,as=mid(13)+acs(av)/15+k,mg=ang(0.833,18)+k,is=ang(adj,18)+k;
  return{Imsak:fajr-10/60,Fajr:fajr,Sunrise:sr,Dhuhr:dh,Asr:as,Maghrib:mg,Isha:is,Midnight:mg+fx(sr-mg,24)/2}}
@@ -138,6 +138,7 @@ const saveLoc=()=>{try{localStorage.setItem('hijri_loc',JSON.stringify(loc))}cat
 const pm=t=>{$('pmsg').textContent=t};
 function prayer(){const dt=new Date(sel*DAY),Y=dt.getUTCFullYear(),M=dt.getUTCMonth()+1,D=dt.getUTCDate(),tz=-new Date(Y,M-1,D,12).getTimezoneOffset()/60;
  const p=pray(Y,M,D,loc.lat,loc.lng,tz,loc.asr);
+ $('pd').textContent='· '+dt.toLocaleDateString('en-GB',{timeZone:'UTC',weekday:'short',day:'numeric',month:'short',year:'numeric'});
  $('pt').innerHTML=Object.keys(p).map(k=>`<div><b>${k}</b><span>${ft(p[k])}</span></div>`).join('');
  $('plc').textContent=`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}${loc.def?' (Karachi, default: set your location)':''} · Karachi method (18°)`;
  $('as').classList.toggle('on',loc.asr===1);$('ah').classList.toggle('on',loc.asr===2)}
