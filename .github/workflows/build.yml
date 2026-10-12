@@ -15,6 +15,7 @@ jobs:
       - run: |
           npm init -y
           npm i @capacitor/core @capacitor/cli @capacitor/android
+          npm i @capacitor/geolocation
           mkdir www && cp index.html www/
           npx cap init "Hijri Calendar" com.example.hijricalendar --web-dir www
           npx cap add android
